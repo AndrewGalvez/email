@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>website</title>
+  </head>
+  <body>
+    <button onclick="refresh();">Refresh</button>
+    <button onclick="logout();">Logout</button>
+
+    <p id="status"></p>
+
+
+    <h3>Messages</h3>
+    <ul id="msgslist">
+    </ul>
+
+    <h3>New Message</h3>
+    <div id="new-msg">
+      <div id="msg-to">
+	<input id="input-msg-to" placeholder="to..."></input>
+      </div>
+      <div id="msg-subject">
+    <input id="input-msg-subject" placeholder="Subject"></input>
+      </div>
+      <div id="msg-body">
+    <textarea id="input-msg-body" placeholder="Body"></textarea>
+      </div>
+    <button onclick="send_message();">Send</button>
+    </div>
+
+    <link rel="stylesheet" href="style.css">
+
+    <script src="script.js"></script>
+  </body>
+</html>
+
