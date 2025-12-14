@@ -29,11 +29,10 @@ async function refresh() {
 
   if (response.ok) {
     for (const message of data.messages) {
-      let msg_json = JSON.parse(message);
       let div = document.createElement("div");
       div.className = "msg-div"
       let txt = document.createElement("p");
-      txt.innerHTML = `(${msg_json.from}) Subject: ${msg_json.subject}`;
+      txt.innerHTML = `(${message.from}) Subject: ${message.subject}`;
       txt.style.display = "inline-block";
       txt.className = "msg-title";
 
@@ -47,7 +46,7 @@ async function refresh() {
 
       let body_txt_div = document.createElement("div");
       let body_txt = document.createElement("p");
-      body_txt.innerHTML = msg_json.body;
+      body_txt.innerHTML = message.body;
       body_txt_div.appendChild(body_txt);
       body_txt_div.style.display = "block";
 
@@ -71,7 +70,7 @@ async function refresh() {
 	    'Authorization': 'Bearer ' + token,
 	  },
 	  body: JSON.stringify({
-	    'id': msg_json.id,
+	    'id': message.id,
 	  }),
  
 	});

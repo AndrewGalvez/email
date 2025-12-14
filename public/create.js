@@ -14,7 +14,7 @@ async function create() {
   );
 
   if (response.ok) {
-    alert("User created. Redirecting to login.");creat
+    alert("User created. Redirecting to login.");
     window.location.href = '/login.html';
   }
 
