@@ -43,12 +43,12 @@ async function loadUsers() {
 	  div.remove();
 	}
 	if (res.status == 401) {
+	  console.log(res.body);
 	  localStorage.removeItem('token');
-	  window.location.href = '/login.html';
+	  //window.location.href = '/login.html';
 	  return;
 	}
 	if (res.status == 404) {
-	  console.log(res);
 	  const data = await res.json();
 	  document.getElementById("status").innerHTML = data.error;
 	  loadUsers();
