@@ -12,11 +12,15 @@ async function login() {
     body: JSON.stringify({ username: uname, password: password })
   });
 
-  const data = await response.json();
 
   if (response.ok) {
+    const data = await response.json();
     localStorage.setItem("token", data.token);
-    window.location.href = '/';
+    if (uname == "admin") {
+      window.location.href = '/admin.html';
+    } else {
+      window.location.href = '/';
+    }
     };
   if (response.status == 404) {
     status.innerHTML = "User not found.";

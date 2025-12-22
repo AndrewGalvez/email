@@ -1,7 +1,6 @@
 #include "httplib.h"
 #include "json.hpp"
 #include "sqlite3.h"
-#include <algorithm>
 #include <iostream>
 #include <string>
 
@@ -199,6 +198,58 @@ public:
 
     return rc == SQLITE_DONE && sqlite3_changes(db) > 0;
   }
+
+  bool deleteUser(const std::string &username) {
+    sqlite3_stmt *stmt;
+    const char *sql = "delete from messages where to_user = ?";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+      return false;
+    }
+
+    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+
+    const char *sql2 = "delete from messages where from_user = ?";
+    if (sqlite3_prepare_v2(db, sql2, -1, &stmt, nullptr) != SQLITE_OK) {
+      return false;
+    }
+
+    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+
+    const char *sql3 = "delete from users where username = ?";
+    if (sqlite3_prepare_v2(db, sql3, -1, &stmt, nullptr) != SQLITE_OK) {
+      return false;
+    }
+    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
+
+    int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+
+    return rc == SQLITE_DONE && sqlite3_changes(db) > 0;
+  }
+
+  std::vector<std::string> getUsers() {
+    std::vector<std::string> users;
+    sqlite3_stmt *stmt;
+    const char *sql = "select username from users order by username";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+      return users;
+    }
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+      std::string username =
+          reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
+      users.push_back(username);
+    }
+
+    sqlite3_finalize(stmt);
+    return users;
+  }
 };
 
 std::string generateToken() {
@@ -223,8 +274,6 @@ int main() {
   svr.set_mount_point("/", "./public");
 
   svr.Post("/api/login", [&db, &sessions](const auto &req, auto &res) {
-    std::cout << " Received request: " << req.body << '\n';
-
     std::string uname;
     std::string password;
 
@@ -262,11 +311,9 @@ int main() {
   });
 
   svr.Post("/api/logout", [&db, &sessions](const auto &req, auto &res) {
-    std::cout << "Received logout request.\n";
     std::string auth = req.get_header_value("Authorization");
     if (auth.empty() || auth.substr(0, 7) != "Bearer ") {
       res.status = 401;
-      std::cout << "bad user auth\n";
       return;
     }
 
@@ -276,7 +323,6 @@ int main() {
       res.status = 401;
       json msg = {"error", "session expired"};
       res.set_content(msg.dump(), "application/json");
-      std::cout << "bad user auth\n";
       return;
     }
 
@@ -348,7 +394,6 @@ int main() {
 
     if (auth.empty() || auth.substr(0, 7) != "Bearer ") {
       res.status = 401;
-      std::cout << "bad user auth\n";
       return;
     }
 
@@ -358,7 +403,6 @@ int main() {
       res.status = 401;
       json msg = {"error", "session expired"};
       res.set_content(msg.dump(), "application/json");
-      std::cout << "bad user auth\n";
       return;
     }
 
@@ -366,7 +410,6 @@ int main() {
     std::string to, subject, body;
 
     try {
-      std::cout << req.body << std::endl;
       auto data = json::parse(req.body);
       to = data["to"];
       subject = data["subject"];
@@ -401,7 +444,6 @@ int main() {
 
     if (auth.empty() || auth.substr(0, 7) != "Bearer ") {
       res.status = 401;
-      std::cout << "bad user auth\n";
       return;
     }
 
@@ -411,12 +453,10 @@ int main() {
       res.status = 401;
       json msg = {"error", "session expired"};
       res.set_content(msg.dump(), "application/json");
-      std::cout << "bad user auth\n";
       return;
     }
     std::string id;
     try {
-      std::cout << req.body << std::endl;
       auto data = json::parse(req.body);
       id = data["id"];
     } catch (json::parse_error &e) {
@@ -435,6 +475,131 @@ int main() {
     } else {
       res.status = 404;
       json error = {{"error", "message not found"}};
+      res.set_content(error.dump(), "application/json");
+      return;
+    }
+  });
+
+  svr.Post("/api/delusr", [&db, &sessions](const auto &req, auto &res) {
+    std::string auth = req.get_header_value("Authorization");
+
+    if (auth.empty() || auth.substr(0, 7) != "Bearer ") {
+      res.status = 401;
+      return;
+    }
+
+    std::string token = auth.substr(7);
+    auto it = sessions.find(token);
+    if (it == sessions.end()) {
+      res.status = 401;
+      json msg = {"error", "session expired"};
+      res.set_content(msg.dump(), "application/json");
+      return;
+    }
+
+    std::string username = it->second;
+
+    if (db.deleteUser(username)) {
+      for (auto it = sessions.begin(); it != sessions.end();) {
+        if (it->second == username)
+          it = sessions.erase(it);
+        else
+          ++it;
+      }
+
+      res.status = 200;
+      res.set_content("{\"status\": \"Success\"}", "application/json");
+      return;
+    } else {
+      res.status = 404;
+      json error = {{"error", "User not found"}};
+      res.set_content(error.dump(), "application/json");
+      return;
+    }
+  });
+
+  svr.Post("/api/lsusrs", [&db, &sessions](const auto &req, auto &res) {
+    std::string auth = req.get_header_value("Authorization");
+
+    if (auth.empty() || auth.substr(0, 7) != "Bearer ") {
+      res.status = 401;
+      return;
+    }
+
+    std::string token = auth.substr(7);
+    auto it = sessions.find(token);
+    if (it == sessions.end()) {
+      res.status = 401;
+      json msg = {"error", "session expired"};
+      res.set_content(msg.dump(), "application/json");
+      return;
+    }
+
+    std::string username = it->second;
+
+    if (username != "admin") {
+      res.status = 401;
+      json msg = {{"error", "access denied"}};
+      res.set_content(msg.dump(), "application/json");
+      return;
+    }
+
+    json response = {{"users", db.getUsers()}};
+    res.status = 200;
+    res.set_content(response.dump(), "application/json");
+  });
+
+  svr.Post("/api/a_delusr", [&db, &sessions](const auto &req, auto &res) {
+    std::string auth = req.get_header_value("Authorization");
+
+    if (auth.empty() || auth.substr(0, 7) != "Bearer ") {
+      res.status = 401;
+      return;
+    }
+
+    std::string token = auth.substr(7);
+    auto it = sessions.find(token);
+    if (it == sessions.end()) {
+      res.status = 401;
+      json msg = {"error", "session expired"};
+      res.set_content(msg.dump(), "application/json");
+      return;
+    }
+
+    std::string username = it->second;
+
+    if (username != "admin") {
+      res.status = 401;
+      json msg = {{"error", "access denied"}};
+      res.set_content(msg.dump(), "application/json");
+    }
+
+    std::string uname_to_del;
+
+    try {
+      auto data = json::parse(req.body);
+      uname_to_del = data["uname"];
+    } catch (json::parse_error &e) {
+      res.status = 400;
+      json error = {{"error", "failed to parse JSON"}};
+      res.set_content(error.dump(), "application/json");
+      return;
+    }
+
+    if (db.deleteUser(uname_to_del)) {
+      for (auto it = sessions.begin(); it != sessions.end();) {
+        if (it->second == username)
+          it = sessions.erase(it);
+        else
+          ++it;
+      }
+
+      res.status = 200;
+      res.set_content("{\"status\": \"Success\"}", "application/json");
+      return;
+    } else {
+      res.status = 404;
+      json error = {{"error", "User not found"}};
       res.set_content(error.dump(), "application/json");
       return;
     }

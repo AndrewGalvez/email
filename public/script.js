@@ -158,4 +158,31 @@ async function send_message() {
 
 };
 
+async function delusr() {
+  let token = localStorage.getItem("token");
+  if (token == null){window.location.href = "/login.html"; return;}
+
+  const response = await fetch('/api/delusr', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + token,
+  },
+  });
+
+  const data = await response.json();
+
+  if (response.status == 401 || response.status == 200) {
+    localStorage.removeItem("token");
+    window.location.href = "/login.html";
+  }
+
+  if (response.status == 404 || response.status == 400) {
+    console.log(data);
+    status.innerHTML = data[1];
+  }
+};
+
 refresh();
+
+setInterval(refresh, 10000);

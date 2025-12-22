@@ -46,3 +46,10 @@ p {
 .msg-title {
   font-size: 18px;
 }
+
+.username-txt {
+  padding: 5px;
+  margin: 5px;
+  border-radius: 5px;
+  background-color: darkgrey;
+}
